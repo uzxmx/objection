@@ -123,7 +123,6 @@ def patch_android_apk(source: str, architecture: str, pause: bool, skip_cleanup:
     """
 
     github = Github(gadget_version=gadget_version)
-    android_gadget = AndroidGadget(github)
 
     # without an architecture set, attempt to determine one using adb
     if not architecture:
@@ -140,8 +139,13 @@ def patch_android_apk(source: str, architecture: str, pause: bool, skip_cleanup:
 
         click.secho('Detected target device architecture as: {0}'.format(architecture), fg='green', bold=True)
 
-    # set the architecture we are interested in
-    android_gadget.set_architecture(architecture)
+    android_gadgets = []
+    for arch in architecture.split(','):
+        android_gadget = AndroidGadget(github)
+        android_gadget.set_architecture(arch.strip())
+        if not android_gadget.gadget_exists():
+            raise Exception('Frida android gadget with architecture %s does not exist at %s' % (arch, android_gadget.get_frida_library_path()))
+        android_gadgets.append(android_gadget)
 
     # check the gadget config flags
     if script_source and not gadget_config:
@@ -149,15 +153,15 @@ def patch_android_apk(source: str, architecture: str, pause: bool, skip_cleanup:
         return
 
     # check if a gadget version was specified. if not, get the latest one.
-    if gadget_version is not None:
-        github_version = gadget_version
-        click.secho('Using manually specified version: {0}'.format(gadget_version), fg='green', bold=True)
-    else:
-        github_version = github.get_latest_version()
-        click.secho('Using latest Github gadget version: {0}'.format(github_version), fg='green', bold=True)
+    # if gadget_version is not None:
+    #     github_version = gadget_version
+    #     click.secho('Using manually specified version: {0}'.format(gadget_version), fg='green', bold=True)
+    # else:
+    #     github_version = github.get_latest_version()
+    #     click.secho('Using latest Github gadget version: {0}'.format(github_version), fg='green', bold=True)
 
     # get local version of the stored gadget
-    local_version = android_gadget.get_local_version('android_' + architecture)
+    # local_version = android_gadget.get_local_version('android_' + architecture)
 
     # check if the local version needs updating. this can be either because
     # the version is outdated or we simply don't have the gadget yet, or, we want
@@ -166,13 +170,13 @@ def patch_android_apk(source: str, architecture: str, pause: bool, skip_cleanup:
     #     # download!
     #     click.secho('Remote FridaGadget version is v{0}, local is v{1}. Downloading...'.format(
     #         github_version, local_version), fg='green')
-    # 
+    #
     #     # download, unpack, update local version and cleanup the temp files.
     #     android_gadget.download() \
     #         .unpack() \
     #         .set_local_version('android_' + architecture, github_version) \
     #         .cleanup()
-    # 
+    #
     # click.secho('Patcher will be using Gadget version: {0}'.format(github_version), fg='green')
 
     patcher = AndroidPatcher(skip_cleanup=skip_cleanup, skip_resources=skip_resources, manifest=manifest)
@@ -201,13 +205,13 @@ def patch_android_apk(source: str, architecture: str, pause: bool, skip_cleanup:
         patcher.add_network_security_config()
 
     patcher.inject_load_library(target_class=target_class)
-    patcher.add_gadget_to_apk(architecture, android_gadget.get_frida_library_path(), gadget_config)
-
-    if script_source:
-        click.secho('Copying over a custom script to use with the gadget config.', fg='green')
-        shutil.copyfile(script_source,
-                        os.path.join(patcher.apk_temp_directory, 'lib', architecture,
-                                     'libfrida-gadget.script.so'))
+    for android_gadget in android_gadgets:
+        patcher.add_gadget_to_apk(android_gadget.architecture, android_gadget.get_frida_library_path(), gadget_config)
+        if script_source:
+            click.secho('Copying over a custom script to use with the gadget config.', fg='green')
+            shutil.copyfile(script_source,
+                            os.path.join(patcher.apk_temp_directory, 'lib', android_gadget.architecture,
+                                         'libfrida-gadget.script.so'))
 
     # if we are required to pause, do that.
     if pause:

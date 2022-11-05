@@ -250,7 +250,8 @@ def patchipa(source: str, gadget_version: str, codesign_signature: str, provisio
 @click.option('--architecture', '-a',
               help=('The architecture of the device the patched APK will run on. '
                     'This can be determined with `adb shell getprop ro.product.cpu.abi`. '
-                    'If it is not specified, this command will try and determine it automatically.'), required=False)
+                    'If it is not specified, this command will try and determine it automatically. '
+                    'Separate multiple architectures by commas.'), required=False)
 @click.option('--gadget-version', '-V', help=('The gadget version to use. If not '
                                               'specified, the latest version will be used.'), default=None)
 @click.option('--pause', '-p', is_flag=True, help='Pause the patcher before rebuilding the APK.',
